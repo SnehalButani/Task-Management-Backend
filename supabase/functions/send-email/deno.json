@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "nodemailer": "https://esm.sh/nodemailer"
+  },
+  "compilerOptions": {
+    "checkJs": false
+  },
+  "deno": {
+    "unstable": true
+  }
+}

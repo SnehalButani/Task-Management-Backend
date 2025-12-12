@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { loginService } from '../services/auth.service.js';
+import {  loginService } from '../services/auth.service.js';
 
-export const fetchUsersController = asyncHandler(async (req: Request, res: Response) => {
+export const fetchUserDetailsController = asyncHandler(async (req: Request, res: Response) => {
     let user = req.user;
     res.status(200).json({ success: true, data: user });
 });

@@ -5,8 +5,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: any;
-      role?: string; // array of role names
-      roleId?: string; // array of role IDs
+      role?: string;
+      roleId?: string; 
     }
   }
 }
@@ -34,7 +34,6 @@ export const authMiddleware = async (
 
     const user = data.user;
 
-    // Fetch user roles from user_roles table
     const { data: userRoles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role_id, roles(name)')
