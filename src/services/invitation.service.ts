@@ -71,7 +71,7 @@ export const inviteEmployeeService = async ({
   sendEmail({
     to: email,
     subject: "You're invited to join our organization",
-    text: `You have been invited to join. Click here to accept: ${process.env.FRONTEND_URL}/accept-invite/${token}`,
+    text: `You have been invited to join.`,
     html: `<p>You have been invited to join our organization.</p>
              <p>Click <a href="${process.env.FRONTEND_URL}/accept-invite/${token}">here</a> to accept the invitation.</p>`,
   });
@@ -88,7 +88,7 @@ export const acceptInviteService = async ({
   userId,
 }: {
   token: string;
-  userId: string;
+  userId?: string;
 }) => {
   const { data: invite, error: inviteError } = await supabase
     .from("invitations")
@@ -98,15 +98,52 @@ export const acceptInviteService = async ({
 
   if (inviteError) throw new Error(inviteError.message);
   if (!invite) throw new Error("Invalid or expired invitation");
-
   if (invite.status !== "pending") {
-    throw new Error("This invitation has already been used or cancelled");
+    throw new Error("This invitation has already been used");
+  }
+
+  let finalUserId = userId;
+  let tempPassword: string | null = null;
+  let isNewUser = false;
+
+  if (!finalUserId) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      perPage: 1000,
+    });
+    if (error) throw new Error(error.message);
+
+    const existingUser = data.users.find(
+      (u) => u.email === invite.email
+    );
+
+    if (existingUser) {
+      finalUserId = existingUser.id;
+    } else {
+      // 🔐 create new user
+      tempPassword = crypto.randomBytes(6).toString("hex");
+      isNewUser = true;
+
+      const { data: newUser, error: createUserError } =
+        await supabase.auth.admin.createUser({
+          email: invite.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            org_id: invite.org_id,
+            role_id: invite.role_id,
+            force_password_change: true,
+          },
+        });
+
+      if (createUserError) throw new Error(createUserError.message);
+      finalUserId = newUser.user.id;
+    }
   }
 
   const { data: employeeData, error: employeeError } = await supabase
     .from("employees")
     .insert({
-      user_id: userId,
+      user_id: finalUserId,
       org_id: invite.org_id,
       role_id: invite.role_id,
       joined_at: new Date().toISOString(),
@@ -116,40 +153,53 @@ export const acceptInviteService = async ({
 
   if (employeeError) throw new Error(employeeError.message);
 
-  const { error: userRoleError } = await supabase
-    .from("user_roles")
-    .insert({
-      user_id: userId,
-      role_id: invite.role_id,
-    })
-    .select()
-    .single();
+  await supabase.from("user_roles").insert({
+    user_id: finalUserId,
+    role_id: invite.role_id,
+  });
 
-  if (userRoleError) throw new Error(userRoleError.message);
 
-  const { error: updateError } = await supabase
+  await supabase
     .from("invitations")
     .update({
       status: "accepted",
       accepted_at: new Date().toISOString(),
     })
-    .eq("id", invite.id)
-    .select()
-    .single();
+    .eq("id", invite.id);
 
-  if (updateError) throw new Error(updateError.message);
 
-  const { error: authMetaError } = await supabase.auth.admin.updateUserById(userId, {
+  await supabase.auth.admin.updateUserById(finalUserId, {
     user_metadata: {
       org_id: invite.org_id,
       role_id: invite.role_id,
     },
   });
 
-  if (authMetaError) console.warn("Failed to update user metadata:", authMetaError.message);
+
+  if (isNewUser && tempPassword) {
+    await sendEmail({
+      to: invite.email,
+      subject: "Your account is ready – Login details",
+      text: `Your invitation has been accepted successfully`,
+      html: `
+        <p>Your invitation has been accepted successfully.</p>
+        <p><b>Login details:</b></p>
+        <p>Email: ${invite.email}</p>
+        <p>Password: <b>${tempPassword}</b></p>
+        <p>
+          <a href="${process.env.FRONTEND_URL}/login">
+            Click here to login
+          </a>
+        </p>
+        <p>Please change your password after login.</p>
+      `,
+    });
+  }
 
   return {
-    message: "Invitation accepted successfully",
+    success: true,
+    message:
+      "Invitation accepted successfully. Login credentials have been sent to your email.",
     employee: employeeData,
   };
 };
