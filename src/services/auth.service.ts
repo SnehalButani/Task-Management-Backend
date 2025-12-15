@@ -44,3 +44,13 @@ export async function loginService(email: string, password: string): Promise<{ u
     };
 
 }
+
+export const getRolesService = async () => {
+     const { data, error } = await supabase
+      .from("roles")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    return data;
+}

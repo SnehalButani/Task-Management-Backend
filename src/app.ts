@@ -13,7 +13,7 @@ app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', userRoutes);
-app.use('/api/organization', organizationRoutes);
+app.use('/api/org', organizationRoutes);
 app.use('/api/invitation', invitationRoutes);
 app.use('/api/task', taskRoutes);
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createOrganizationController, deleteOrganizationController, getAllOrganizationsController, getOrganizationByIdController, getUsersByOrgController, updateOrganizationController } from '../controllers/organization.controller.js';
+import { createOrganizationController, deleteOrganizationController, getAllOrganizationsController, getOrganizationByIdController, getOrgTeamMembersController, updateOrganizationController } from '../controllers/organization.controller.js';
 import { authMiddleware, authorizeRoles } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -10,10 +10,10 @@ router.get("/:orgId", authMiddleware, getOrganizationByIdController);
 router.put("/:orgId", authMiddleware, authorizeRoles('OWNER'), updateOrganizationController);
 router.delete("/:orgId", authMiddleware, authorizeRoles('OWNER'), deleteOrganizationController);
 router.get(
-  "/by-org",
+  "/by-org/:orgId",
   authMiddleware,
   authorizeRoles("OWNER", "MANAGER"), // only OWNER/MANAGER can access
-  getUsersByOrgController
+  getOrgTeamMembersController
 );
 
 export default router;

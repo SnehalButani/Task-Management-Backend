@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import {  loginService } from '../services/auth.service.js';
+import {  getRolesService, loginService } from '../services/auth.service.js';
 
 export const fetchUserDetailsController = asyncHandler(async (req: Request, res: Response) => {
     let user = req.user;
@@ -28,4 +28,9 @@ export const loginController = asyncHandler(async (req: Request, res: Response) 
         message: 'Login successful',
         data: { user, session },
     });
+});
+
+export const getRolesController = asyncHandler(async (req: Request, res: Response) => {
+    const roles = await getRolesService();
+    res.status(200).json({ success: true, data: roles });
 });

@@ -10,7 +10,7 @@ interface CreateOrganizationInput {
 
 interface UpdateOrganizationInput {
   orgId: string;
-  userId: string; 
+  userId: string;
   org_name?: string;
   industry?: string;
   timezone?: string;
@@ -49,17 +49,6 @@ export const createOrganizationService = async ({
 
   if (empError) {
     throw new Error(empError.message);
-  }
-
-  const { error: userRoleErr } = await supabase
-    .from("user_roles")
-    .upsert({
-      user_id: userId,
-      role_id: roleId,
-    });
-
-  if (userRoleErr) {
-    throw new Error(userRoleErr.message);
   }
 
   return orgData;
@@ -107,23 +96,28 @@ export const updateOrganizationService = async ({
 
   if (orgError) throw new Error(orgError.message);
   if (!org) throw new Error("Organization not found");
-  if (org.owner_id !== userId) throw new Error("Unauthorized: Not the owner");
+  if (org.owner_id !== userId) {
+    throw new Error("Unauthorized: Not the owner");
+  }
 
-  const { data, error } = await supabase
+  const { data: updatedRows, error: updateError } = await supabase
     .from("organizations")
     .update({
-      ...(org_name && { org_name }),
-      ...(industry && { industry }),
-      ...(timezone && { timezone }),
+      ...(org_name !== undefined && { org_name }),
+      ...(industry !== undefined && { industry }),
+      ...(timezone !== undefined && { timezone }),
     })
     .eq("id", orgId)
-    .select()
-    .single();
+    .select();
 
-  if (error) throw new Error(error.message);
+  if (updateError) throw new Error(updateError.message);
+  if (!updatedRows || updatedRows.length === 0) {
+    throw new Error("Update failed or no rows affected");
+  }
 
-  return data;
+  return updatedRows[0];
 };
+
 
 export const deleteOrganizationService = async (orgId: string, userId: string) => {
   const { data: org, error: orgError } = await supabase
@@ -146,28 +140,80 @@ export const deleteOrganizationService = async (orgId: string, userId: string) =
   return { success: true, message: "Organization deleted successfully" };
 };
 
-export const getUsersByOrgService = async (org_id: string) => {
-  const { data, error } = await supabase
+export const getOrgTeamMembersService = async (orgId: string) => {
+  /* 1️⃣ Employees */
+  const { data: employees, error: empError } = await supabase
     .from("employees")
     .select(`
       id,
       user_id,
-      org_id,
       created_at,
-      roles:role_id (name),
-      auth_users:user_id (email, user_metadata)
+      roles:role_id (name)
     `)
-    .eq("org_id", org_id);
+    .eq("org_id", orgId);
 
-  if (error) throw new Error(error.message);
+  if (empError) throw new Error(empError.message);
 
-  // Map response to a cleaner format
-  return data.map((emp: any) => ({
-    employee_id: emp.id,
-    user_id: emp.user_id,
-    email: emp.auth_users?.email,
-    full_name: emp.auth_users?.user_metadata?.full_name || null,
-    role: emp.roles?.name,
-    joined_at: emp.created_at,
-  }));
+  /* 2️⃣ Get user emails from auth.users */
+  const userIds = (employees ?? []).map((e) => e.user_id).filter(Boolean);
+
+  let usersMap: Record<string, any> = {};
+
+  if (userIds.length > 0) {
+    const { data: users, error: userError } =
+      await supabase.auth.admin.listUsers();
+
+    if (userError) throw new Error(userError.message);
+
+    usersMap = users.users.reduce((acc: any, user: any) => {
+      acc[user.id] = user;
+      return acc;
+    }, {});
+  }
+
+  /* 3️⃣ Invitations */
+  const { data: invitations, error: invError } = await supabase
+    .from("invitations")
+    .select(`
+      id,
+      email,
+      created_at,
+      roles:role_id (name)
+    `)
+    .eq("org_id", orgId)
+    .eq("status", "pending");
+
+  if (invError) throw new Error(invError.message);
+
+  /* 4️⃣ Normalize */
+  const activeMembers =
+    (employees ?? []).map((emp: any) => ({
+      id: emp.id,
+      email: usersMap[emp.user_id]?.email ?? null,
+      full_name:
+        usersMap[emp.user_id]?.email.split("@")[0]
+          .replace(/[._-]/g, " ")
+          .replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? null,
+      role: emp.roles?.name ?? null,
+      status: "Accepted",
+      joined_at: emp.created_at,
+      is_invitation: false,
+    }));
+
+  const pendingMembers =
+    (invitations ?? []).map((inv: any) => ({
+      id: inv.id,
+      email: inv.email,
+      full_name:
+        inv.email.split("@")[0]
+          .replace(/[._-]/g, " ")
+          .replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? null,
+      role: inv.roles?.name ?? null,
+      status: "Pending Invitation",
+      joined_at: inv.created_at,
+      is_invitation: true,
+    }));
+
+  return [...activeMembers, ...pendingMembers];
 };
+
