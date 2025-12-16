@@ -46,11 +46,71 @@ export async function loginService(email: string, password: string): Promise<{ u
 }
 
 export const getRolesService = async () => {
-     const { data, error } = await supabase
-      .from("roles")
-      .select("id, name")
-      .order("name", { ascending: true });
+    const { data, error } = await supabase
+        .from("roles")
+        .select("id, name")
+        .order("name", { ascending: true });
 
     if (error) throw error;
     return data;
 }
+
+export const deleteAuthUserService = async (userId: string) => {
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+
+    if (error) {
+        console.error("Supabase delete user error:", error);
+        throw new Error(error.message);
+    }
+
+    return {
+        success: true,
+        message: "User deleted successfully",
+    };
+};
+
+export const changePasswordService = async ({
+    userId,
+    newPassword,
+}: {
+    userId: string;
+    newPassword: string;
+}
+) => {
+    const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+        password: newPassword,
+    });
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    return {
+        success: true,
+        message: "Password changed successfully",
+    };
+};
+
+export const updateDisplayNameService = async ({
+  userId,
+  displayName,
+}: {
+  userId: string;
+  displayName: string;
+}) => {
+  const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      displayName,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    success: true,
+    message: "Profile updated successfully",
+    data,
+  };
+};

@@ -150,7 +150,8 @@ export const getOrgTeamMembersService = async (orgId: string) => {
       created_at,
       roles:role_id (name)
     `)
-    .eq("org_id", orgId);
+    .eq("org_id", orgId)
+   .is("deleted_at", null)
 
   if (empError) throw new Error(empError.message);
 
@@ -217,3 +218,24 @@ export const getOrgTeamMembersService = async (orgId: string) => {
   return [...activeMembers, ...pendingMembers];
 };
 
+export const softDeleteEmployeeService = async (
+  orgId: string,
+  employeeId: string
+) => {
+  const { data, error } = await supabase
+    .from("employees")
+    .update({
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", employeeId)
+    .eq("org_id", orgId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    success: true,
+    message: "Employee soft-deleted successfully",
+  };
+};

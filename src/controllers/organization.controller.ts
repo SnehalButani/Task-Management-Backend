@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { createOrganizationService, deleteOrganizationService, getAllOrganizationsService, getOrganizationByIdService, getOrgTeamMembersService,  updateOrganizationService } from "../services/organization.service.js";
+import { createOrganizationService, deleteOrganizationService, getAllOrganizationsService, getOrganizationByIdService, getOrgTeamMembersService,  softDeleteEmployeeService,  updateOrganizationService } from "../services/organization.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const createOrganizationController = asyncHandler(async (req: Request, res: Response) => {
@@ -86,3 +86,16 @@ export const getOrgTeamMembersController = asyncHandler(async (req: any, res: Re
   const users = await getOrgTeamMembersService(org_id);
   res.status(200).json({ success: true, data: users });
 })
+
+export const softDeleteEmployeeController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { orgId, employeeId } = req.params;
+
+    const result = await softDeleteEmployeeService(orgId, employeeId);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  }
+);

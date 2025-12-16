@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import {  getRolesService, loginService } from '../services/auth.service.js';
+import {  changePasswordService, deleteAuthUserService, getRolesService, loginService, updateDisplayNameService } from '../services/auth.service.js';
 
 export const fetchUserDetailsController = asyncHandler(async (req: Request, res: Response) => {
     let user = req.user;
@@ -34,3 +34,23 @@ export const getRolesController = asyncHandler(async (req: Request, res: Respons
     const roles = await getRolesService();
     res.status(200).json({ success: true, data: roles });
 });
+
+export const deleteAuthUserController = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const result = await deleteAuthUserService(userId);
+    res.status(200).json({ success: true, message: result.message });
+});
+
+export const changePasswordController = asyncHandler(async (req: Request, res: Response) => {
+    const { newPassword } = req.body;
+    const userId = req.user.id;
+    const result = await changePasswordService({ userId, newPassword });
+    res.status(200).json({ success: true, message: result.message });
+});
+
+export const updateUserController = asyncHandler(async (req: Request, res: Response) => {
+    const { displayName } = req.body;
+    const userId = req.user.id;
+    const result = await updateDisplayNameService({ userId, displayName });
+    res.status(200).json({ success: true, message: result.message });
+}); 
