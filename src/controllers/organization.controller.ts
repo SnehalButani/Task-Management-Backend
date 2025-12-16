@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { createOrganizationService, deleteOrganizationService, getAllOrganizationsService, getOrganizationByIdService, getOrgTeamMembersService,  softDeleteEmployeeService,  updateOrganizationService } from "../services/organization.service.js";
+import { createOrganizationService,  getAllOrganizationsService, getOrganizationByIdService, getOrgTeamMembersService,  softDeleteEmployeeService,  softDeleteOrganizationService,  updateOrganizationService } from "../services/organization.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const createOrganizationController = asyncHandler(async (req: Request, res: Response) => {
@@ -64,11 +64,11 @@ export const updateOrganizationController = asyncHandler(async (req: Request, re
   });
 });
 
-export const deleteOrganizationController = asyncHandler(async (req: Request, res: Response) => {
+export const softDeleteOrganizationController = asyncHandler(async (req: Request, res: Response) => {
   const user = req.user;
   const { orgId } = req.params;
 
-  const result = await deleteOrganizationService(orgId, user.id);
+  const result = await softDeleteOrganizationService(orgId, user.id);
 
   return res.status(200).json({
     success: true,
@@ -78,12 +78,9 @@ export const deleteOrganizationController = asyncHandler(async (req: Request, re
 
 export const getOrgTeamMembersController = asyncHandler(async (req: any, res: Response) => {
   const org_id = req.params.orgId as string;
+  const { role } = req.user;
 
-  if (!org_id) {
-    return res.status(400).json({ success: false, message: "org_id is required" });
-  }
-
-  const users = await getOrgTeamMembersService(org_id);
+  const users = await getOrgTeamMembersService(org_id, role);
   res.status(200).json({ success: true, data: users });
 })
 

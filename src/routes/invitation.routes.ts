@@ -4,7 +4,7 @@ import { authMiddleware, authorizeRoles } from "../middleware/auth.middleware.js
 
 const router = Router();
 
-router.post('/', authMiddleware, authorizeRoles('OWNER'), inviteEmployeeController);
+router.post('/', authMiddleware, authorizeRoles('OWNER', 'MANAGER'), inviteEmployeeController);
 router.get('/accept/:token', acceptInviteController);
 
 

@@ -119,7 +119,7 @@ export const updateOrganizationService = async ({
 };
 
 
-export const deleteOrganizationService = async (orgId: string, userId: string) => {
+export const softDeleteOrganizationService = async (orgId: string, userId: string) => {
   const { data: org, error: orgError } = await supabase
     .from("organizations")
     .select("owner_id")
@@ -132,7 +132,7 @@ export const deleteOrganizationService = async (orgId: string, userId: string) =
 
   const { error: delError } = await supabase
     .from("organizations")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", orgId);
 
   if (delError) throw new Error(delError.message);
@@ -140,22 +140,31 @@ export const deleteOrganizationService = async (orgId: string, userId: string) =
   return { success: true, message: "Organization deleted successfully" };
 };
 
-export const getOrgTeamMembersService = async (orgId: string) => {
-  /* 1️⃣ Employees */
-  const { data: employees, error: empError } = await supabase
+export const getOrgTeamMembersService = async (
+  orgId: string,
+  role: "OWNER" | "MANAGER" | "EMPLOYEE"
+) => {
+  let empQuery = supabase
     .from("employees")
     .select(`
-      id,
-      user_id,
-      created_at,
-      roles:role_id (name)
-    `)
-    .eq("org_id", orgId)
-   .is("deleted_at", null)
+        id,
+        user_id,
+        org_id,
+        created_at,
+        roles:role_id (name),
+        organization:org_id (
+          org_name
+        )
+      `)
+    .is("deleted_at", null);
 
+  if (role !== "OWNER") {
+    empQuery = empQuery.eq("org_id", orgId);
+  }
+
+  const { data: employees, error: empError } = await empQuery;
   if (empError) throw new Error(empError.message);
 
-  /* 2️⃣ Get user emails from auth.users */
   const userIds = (employees ?? []).map((e) => e.user_id).filter(Boolean);
 
   let usersMap: Record<string, any> = {};
@@ -172,8 +181,7 @@ export const getOrgTeamMembersService = async (orgId: string) => {
     }, {});
   }
 
-  /* 3️⃣ Invitations */
-  const { data: invitations, error: invError } = await supabase
+  let invQuery = supabase
     .from("invitations")
     .select(`
       id,
@@ -181,18 +189,24 @@ export const getOrgTeamMembersService = async (orgId: string) => {
       created_at,
       roles:role_id (name)
     `)
-    .eq("org_id", orgId)
     .eq("status", "pending");
 
+  if (role !== "OWNER") {
+    invQuery = invQuery.eq("org_id", orgId);
+  }
+
+  const { data: invitations, error: invError } = await invQuery;
   if (invError) throw new Error(invError.message);
 
-  /* 4️⃣ Normalize */
   const activeMembers =
     (employees ?? []).map((emp: any) => ({
       id: emp.id,
+      org_id: emp.org_id,
+      org_name: emp.organization?.org_name ?? null,
       email: usersMap[emp.user_id]?.email ?? null,
       full_name:
-        usersMap[emp.user_id]?.email.split("@")[0]
+        usersMap[emp.user_id]?.email
+          ?.split("@")[0]
           .replace(/[._-]/g, " ")
           .replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? null,
       role: emp.roles?.name ?? null,
@@ -206,7 +220,8 @@ export const getOrgTeamMembersService = async (orgId: string) => {
       id: inv.id,
       email: inv.email,
       full_name:
-        inv.email.split("@")[0]
+        inv.email
+          .split("@")[0]
           .replace(/[._-]/g, " ")
           .replace(/\b\w/g, (c: string) => c.toUpperCase()) ?? null,
       role: inv.roles?.name ?? null,
@@ -214,8 +229,15 @@ export const getOrgTeamMembersService = async (orgId: string) => {
       joined_at: inv.created_at,
       is_invitation: true,
     }));
+  const uniqueActiveMembers = Object.values(
+    activeMembers.reduce((acc: any, member: any) => {
+      acc[member.email] = member;
+      return acc;
+    }, {})
+  );
 
-  return [...activeMembers, ...pendingMembers];
+  return [...uniqueActiveMembers, ...pendingMembers];
+
 };
 
 export const softDeleteEmployeeService = async (

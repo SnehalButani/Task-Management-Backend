@@ -11,12 +11,12 @@ export const createTaskController = asyncHandler(async (req: Request, res: Respo
 export const getOrgEmpolyeeController = asyncHandler(
   async (req: any, res: Response) => {
     const { orgId } = req.params;
-    const { role, id } = req.user; 
+    const { role, orgIds } = req.user;
 
     const data = await getOrgEmployeeService(
       orgId,
       role,
-      id
+      orgIds
     );
 
     res.status(200).json({

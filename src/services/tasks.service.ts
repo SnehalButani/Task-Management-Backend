@@ -95,31 +95,42 @@ export async function deleteTaskService(id: string) {
 export const getOrgEmployeeService = async (
   orgId: string,
   role: "OWNER" | "MANAGER" | "EMPLOYEE",
-  currentUserId?: string
+  orgIds: string[] | null
 ) => {
   let query = supabase
     .from("employees")
-    .select(`id, user_id, created_at, roles:role_id(name)`)
-    .eq("org_id", orgId);
+    .select(`
+      id,
+      user_id,
+      org_id,
+      created_at,
+      roles:role_id (name)
+    `)
+    .is("deleted_at", null);
 
-  if (role === "EMPLOYEE") {
-    if (!currentUserId) throw new Error("Current user ID is required for EMPLOYEE role");
-    query = query.eq("user_id", currentUserId);
+  if (role === "OWNER") {
+    if (!orgIds || orgIds.length === 0) return [];
+    query = query.in("org_id", orgIds);
+  } 
+  else {
+    query = query.eq("org_id", orgId);
   }
 
-  const { data: employees, error: empError } = await query;
-  if (empError) throw new Error(empError.message);
+  const { data: employees, error } = await query;
+  if (error) throw new Error(error.message);
   if (!employees || employees.length === 0) return [];
 
-  const userIds = employees.map((e) => e.user_id).filter(Boolean);
+  const userIds = employees.map(e => e.user_id).filter(Boolean);
   const usersMap = await mapUsersFullName(userIds);
 
-  return employees.map((emp) => {
-    const user = usersMap[emp.user_id];
-    return {
-      ...emp,
-      email: user?.email || "",
-      full_name: user?.full_name || "",
-    };
-  });
+  return employees
+    .filter((e: any) => e.roles?.name === "EMPLOYEE")
+    .map((emp: any) => {
+      const user = usersMap[emp.user_id] || {};
+      return {
+        id: emp.id,
+        email: user.email || "",
+        full_name: user.full_name || "",
+      };
+    });
 };
