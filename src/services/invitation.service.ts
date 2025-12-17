@@ -132,6 +132,7 @@ export const acceptInviteService = async ({
             org_id: invite.org_id,
             role_id: invite.role_id,
             force_password_change: true,
+            display_name: invite.email,
           },
         });
 
